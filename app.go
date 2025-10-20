@@ -1,23 +1,43 @@
 package main //main tells go that main package is the main entry point
 import (
-	"fmt"
-	"math"
+	"net/http"
+
+	"example.com/first-app/api-test/db"
+	"example.com/first-app/models"
+	"github.com/gin-gonic/gin"
 )
 
 // uint - non negative integer data type, int=0, string="", float64=0.0, bool= false, int32
 func main() {
-	const inflationRate = 2.5
-	var years float64 = 10
-	var investmentAmount float64
-	expectedReturnRate := 5.5 //short notation to declare a variable
+	db.InitDB()
+	server := gin.Default()
+	server.GET("/events", getEvents)
+	server.POST("/events", createEvent)
+	server.Run(":8080") //localhost 8080
+}
 
-	//input
-	fmt.Print("Please enter the Investment Amount: ")
-	fmt.Scan(&investmentAmount)
+func getEvents(context *gin.Context) {
+	events, err := models.GetAllEvents()
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"message": "Could not fetch events. Try again later."})
+	}
+	context.JSON(http.StatusOK, events)
+}
 
-	//output
-	futureValue := investmentAmount * math.Pow(1+expectedReturnRate/100, years)
-	futureRealValue := futureValue / math.Pow(1+inflationRate/100, years)
-	fmt.Println(futureValue)
-	fmt.Println(futureRealValue)
+func createEvent(context *gin.Context) {
+	var event models.Event
+	err := context.ShouldBindJSON(&event)
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not parse requested data."})
+	}
+	event.ID = 1
+	event.UserID = 1
+
+	err = event.Save()
+
+	if err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"message": "Could not create event. Try again later."})
+		return
+	}
+	context.JSON(http.StatusCreated, gin.H{"message": "Event created!", "event": event})
 }
